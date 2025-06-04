@@ -53,9 +53,6 @@ def create_predictions_dataframe(model_results):
 
 def run_analysis():
     """Run analysis with Linear, SVR, LSTM, GRU, and RNN models"""
-    print("=" * 80)
-    print(" " * 20 + "COMPREHENSIVE POSITION ESTIMATION ANALYSIS")
-    print("=" * 80)
     
     # Create results directory if it doesn't exist
     os.makedirs('results/models', exist_ok=True)
@@ -65,7 +62,6 @@ def run_analysis():
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     
     # 1. Load and explore data
-    print("\n1. Loading and exploring data...")
     df_list = []
     
     # Load all available datasets
@@ -85,7 +81,6 @@ def run_analysis():
         return
     
     # 2. Feature Engineering
-    print("\n2. Feature Engineering...")
     df_engineered = create_engineered_features(df_all, include_categorical=True)
     
     # Select features - exclude any coordinate-based features
@@ -105,7 +100,6 @@ def run_analysis():
     print(f"  Top features: {selected_features[:10]}")
     
     # 3. Train all models and collect results
-    print("\n3. Training all models...")
     all_model_results = []
     
     # Clear GPU memory before starting
@@ -138,7 +132,6 @@ def run_analysis():
             'predicted': lstm_results['r_pred']
         }
     }, lstm_save_path)
-    print(f"Saved LSTM model to {lstm_save_path}")
     
     # Clear GPU memory after LSTM
     if torch.cuda.is_available():
@@ -186,7 +179,6 @@ def run_analysis():
             'predicted': gru_results['r_pred']
         }
     }, gru_save_path)
-    print(f"Saved GRU model to {gru_save_path}")
     
     # Clear GPU memory after GRU
     if torch.cuda.is_available():
@@ -209,12 +201,10 @@ def run_analysis():
     })
     
     # Train and save RNN model
-    print("\nTraining RNN model...")
     rnn_results = train_rnn_on_all(DATA_CONFIG['processed_dir'])
     
     # Plot RNN actual vs estimated
     if TRAINING_OPTIONS['save_predictions']:
-        print("\nSaving RNN actual vs estimated plots...")
         plot_actual_vs_estimated(
             np.array(rnn_results['r_actual']),
             np.array(rnn_results['r_pred']),
@@ -235,7 +225,6 @@ def run_analysis():
             'predicted': rnn_results['r_pred']
         }
     }, rnn_save_path)
-    print(f"Saved RNN model to {rnn_save_path}")
     
     # Clear GPU memory after RNN
     if torch.cuda.is_available():
@@ -258,7 +247,6 @@ def run_analysis():
     })
     
     # Train sklearn models
-    print("\nTraining traditional ML models...")
     sklearn_results = train_all_models_enhanced(
         DATA_CONFIG['processed_dir'],
         include_slow_models=TRAINING_OPTIONS['include_slow_models']
