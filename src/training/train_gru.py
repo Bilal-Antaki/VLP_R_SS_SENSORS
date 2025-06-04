@@ -4,28 +4,35 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from src.data.loader import load_cir_data
 from src.data.preprocessing import scale_and_sequence
-from src.config import DATA_CONFIG
+from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG
 import numpy as np
 import random
 import time
 
 class GRUModel(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=256, num_layers=3, dropout=0.4):
+    def __init__(self, input_dim=2, hidden_dim=None, num_layers=None, dropout=None):
         super(GRUModel, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
+        # Use provided parameters or fall back to config values
+        self.hidden_dim = hidden_dim if hidden_dim is not None else GRU_CONFIG['hidden_dim']
+        self.num_layers = num_layers if num_layers is not None else GRU_CONFIG['num_layers']
+        self.dropout = dropout if dropout is not None else GRU_CONFIG['dropout']
         
-        # Simple GRU layer
+        # GRU layer with matching LSTM architecture
         self.gru = nn.GRU(
             input_dim, 
-            hidden_dim,
-            num_layers=num_layers,
+            self.hidden_dim,
+            num_layers=self.num_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0
+            dropout=self.dropout if self.num_layers > 1 else 0
         )
         
-        # Simple output layer
-        self.fc = nn.Linear(hidden_dim, 1)
+        # Complex output layer matching LSTM
+        self.fc = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(self.dropout),
+            nn.Linear(self.hidden_dim // 2, 1)
+        )
     
     def forward(self, x):
         # GRU forward pass
@@ -34,39 +41,48 @@ class GRUModel(nn.Module):
         # Use only the last output
         last_out = gru_out[:, -1, :]
         
-        # Predict single value
+        # Pass through complex output layer
         out = self.fc(last_out)
         return out.squeeze(-1)
 
-def train_gru_on_all(processed_dir: str, model_variant: str = "gru", 
-                     batch_size: int = 32, epochs: int = 300, 
-                     lr: float = 0.001, seq_len: int = 15):
+def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = None, lr: float = None):
     """
-    Train simplified GRU model for position estimation
+    Train GRU model for position estimation with architecture matching successful LSTM
     """
+    # Use config values if not provided
+    batch_size = batch_size if batch_size is not None else TRAINING_CONFIG['batch_size']
+    epochs = epochs if epochs is not None else TRAINING_CONFIG['epochs']
+    lr = lr if lr is not None else TRAINING_CONFIG['learning_rate']
+    
     # Generate random seed based on current time
-    random_seed = int(time.time() * 1000) % 100000
+    random_seed = TRAINING_CONFIG['random_seed']
     print(f"Using random seed: {random_seed}")
     
     # Set random seeds
     torch.manual_seed(random_seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(random_seed)
+    torch.cuda.manual_seed(random_seed)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
     np.random.seed(random_seed)
     random.seed(random_seed)
     
+    # Use sequence length from config
+    seq_len = GRU_CONFIG.get('sequence_length', 10)
+    
     # Load data using dataset from config
     df = load_cir_data(processed_dir, filter_keyword=DATA_CONFIG['datasets'][0])
-    print(f"Loaded {len(df)} data points from {DATA_CONFIG['datasets'][0]}")
+    
     
     # Scale and create sequences
     X_seq, y_seq, x_scaler, y_scaler = scale_and_sequence(df, seq_len=seq_len)
     
-    # Split data with random seed
+    if len(X_seq) < 100:
+        print(f"Warning: Very few sequences ({len(X_seq)}). Consider reducing seq_len.")
+    
+    # Split data using config validation split
     X_train, X_val, y_train, y_val = train_test_split(
-        X_seq, y_seq, test_size=0.2, random_state=random_seed, shuffle=True
+        X_seq, y_seq, test_size=TRAINING_CONFIG['validation_split'], 
+        random_state=random_seed, shuffle=True
     )
     
     # Create data loaders
@@ -74,8 +90,7 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
         TensorDataset(X_train, y_train), 
         batch_size=batch_size, 
         shuffle=True,
-        drop_last=True,
-        generator=torch.Generator().manual_seed(random_seed + 1)
+        drop_last=True  # Ensure consistent batch sizes
     )
     val_loader = DataLoader(
         TensorDataset(X_val, y_val), 
@@ -83,15 +98,15 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
         drop_last=False
     )
     
-    # Create simplified model
+    # Create model with config values
     model = GRUModel(
         input_dim=2,
-        hidden_dim=256,
-        num_layers=3,
-        dropout=0.4
+        hidden_dim=GRU_CONFIG['hidden_dim'],
+        num_layers=GRU_CONFIG['num_layers'],
+        dropout=GRU_CONFIG['dropout']
     )
     
-    # Initialize weights
+    # Initialize weights using orthogonal initialization
     def init_weights(m):
         if isinstance(m, nn.GRU):
             for name, param in m.named_parameters():
@@ -112,32 +127,21 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
     print(f"Using device: {device}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
     
-    # Use MSE loss
+    # Use same loss and optimizer as LSTM with config values
     criterion = nn.MSELoss()
-    
-    # Use AdamW optimizer
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=lr,
-        weight_decay=1e-4,
-        betas=(0.9, 0.99)
+    optimizer = torch.optim.Adam(
+        model.parameters(), 
+        lr=lr, 
+        weight_decay=TRAINING_CONFIG['weight_decay']
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=10
     )
     
-    # Use OneCycle learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=lr,
-        epochs=epochs,
-        steps_per_epoch=len(train_loader),
-        pct_start=0.3,
-        anneal_strategy='cos'
-    )
-    
-    train_loss_hist = []
-    val_loss_hist = []
+    train_loss_hist, val_loss_hist = [], []
     best_val_loss = float('inf')
     patience_counter = 0
-    early_stop_patience = 20
+    early_stop_patience = TRAINING_CONFIG.get('patience', 20)
     
     for epoch in range(epochs):
         # Training
@@ -157,8 +161,6 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             
             optimizer.step()
-            scheduler.step()
-            
             train_loss += loss.item()
             train_batches += 1
         
@@ -185,6 +187,15 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
         train_loss_hist.append(train_loss)
         val_loss_hist.append(val_loss)
         
+        # Learning rate scheduling
+        prev_lr = optimizer.param_groups[0]['lr']
+        scheduler.step(val_loss)
+        new_lr = optimizer.param_groups[0]['lr']
+        
+        # Manual verbose output for learning rate changes
+        if new_lr != prev_lr:
+            print(f"  Learning rate reduced from {prev_lr:.6f} to {new_lr:.6f}")
+        
         # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -198,12 +209,14 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
         
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
+            # Check prediction diversity
+            pred_std = np.std(y_val_pred)
+            print(f"  Prediction std: {pred_std:.6f}")
     
     # Generate predictions on full dataset
     model.eval()
     with torch.no_grad():
-        X_seq_tensor = torch.tensor(X_seq, dtype=torch.float32).to(device)
-        full_preds_scaled = model(X_seq_tensor).cpu().numpy()
+        full_preds_scaled = model(X_seq.to(device)).cpu().numpy()
         full_targets_scaled = y_seq.numpy()
     
     # Inverse transform
@@ -212,17 +225,13 @@ def train_gru_on_all(processed_dir: str, model_variant: str = "gru",
     
     rmse = np.sqrt(np.mean((full_targets - full_preds) ** 2))
     
-    print(f"\nFinal Metrics:")
-    print(f"RMSE: {rmse:.4f}")
-    print(f"Prediction range: [{full_preds.min():.2f}, {full_preds.max():.2f}]")
-    print(f"Target range: [{full_targets.min():.2f}, {full_targets.max():.2f}]")
-    print(f"Prediction std: {np.std(full_preds):.4f}")
-    print(f"Target std: {np.std(full_targets):.4f}")
-    
     return {
         'r_actual': full_targets.tolist(),
         'r_pred': full_preds.tolist(),
         'train_loss': train_loss_hist,
         'val_loss': val_loss_hist,
-        'rmse': rmse
+        'rmse': rmse,
+        'original_df_size': len(df),
+        'sequence_size': len(full_targets),
+        'seq_len': seq_len
     }

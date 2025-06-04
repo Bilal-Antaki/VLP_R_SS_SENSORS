@@ -1,11 +1,11 @@
 from src.data.feature_engineering import create_engineered_features, select_features
+from src.utils.visualizations import plot_actual_vs_estimated, plot_rmse_comparison
 from src.config import DATA_CONFIG, ANALYSIS_CONFIG, TRAINING_OPTIONS
 from src.training.train_sklearn import train_all_models_enhanced
 from src.training.train_lstm import train_lstm_on_all
 from src.training.train_gru import train_gru_on_all
 from src.training.train_rnn import train_rnn_on_all
 from src.data.loader import load_cir_data
-from src.utils.visualizations import plot_actual_vs_estimated, plot_rmse_comparison
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -118,7 +118,6 @@ def run_analysis():
     
     # Plot LSTM actual vs estimated
     if TRAINING_OPTIONS['save_predictions']:
-        print("\nSaving LSTM actual vs estimated plots...")
         plot_actual_vs_estimated(
             np.array(lstm_results['r_actual']),
             np.array(lstm_results['r_pred']),
@@ -167,7 +166,6 @@ def run_analysis():
     
     # Plot GRU actual vs estimated
     if TRAINING_OPTIONS['save_predictions']:
-        print("\nSaving GRU actual vs estimated plots...")
         plot_actual_vs_estimated(
             np.array(gru_results['r_actual']),
             np.array(gru_results['r_pred']),
@@ -283,7 +281,6 @@ def run_analysis():
             
             # Plot actual vs estimated for sklearn models
             if TRAINING_OPTIONS['save_predictions']:
-                print(f"\nSaving {result['name']} actual vs estimated plots...")
                 plot_actual_vs_estimated(
                     result['y_test'],
                     result['y_pred'],
@@ -302,7 +299,6 @@ def run_analysis():
             })
     
     # Create RMSE comparison plot
-    print("\nSaving RMSE comparison plot...")
     plot_rmse_comparison(all_model_results, save_dir="results/plots")
     
     # 5. Statistical Analysis and Results
@@ -314,8 +310,7 @@ def run_analysis():
     if TRAINING_OPTIONS['save_predictions']:
         save_analysis_results(all_model_results)
     
-    print("\nAnalysis complete. All models saved in results/models/")
-    print("All plots saved in results/plots/")
+    print("\nAnalysis complete.")
 
 def create_analysis_figures(model_results, df_raw):
     # Figure 1: Model Performance Comparison

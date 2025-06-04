@@ -1,14 +1,13 @@
 # src/training/train_enhanced.py
-from src.models.model_registry import get_model
+from sklearn.model_selection import train_test_split, cross_val_score
 from src.data.loader import load_cir_data, extract_features_and_target
 from src.evaluation.metrics import calculate_all_metrics
-from src.config import DATA_CONFIG
-from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
+from src.models.model_registry import get_model
+from src.config import DATA_CONFIG
 import numpy as np
-import pandas as pd
-import time
 import warnings
+import time
 warnings.filterwarnings('ignore')
 
 def train_model_with_metrics(model_name, X_train, X_test, y_train, y_test, **model_kwargs):
@@ -122,7 +121,7 @@ def train_all_models_enhanced(processed_dir: str, test_size: float = 0.2,
             else:
                 time_str = f"{train_time:.2f}s"
             
-            print(f"✓ RMSE: {result['metrics']['rmse']:.4f}, Time: {time_str}")
+            print(f"RMSE: {result['metrics']['rmse']:.4f}, Time: {time_str}")
             results.append(result)
             successful_results.append({
                 'name': display_name,
@@ -130,7 +129,7 @@ def train_all_models_enhanced(processed_dir: str, test_size: float = 0.2,
                 'y_pred': result['y_pred']
             })
         else:
-            print(f"✗ Failed: {result['error']}")
+            print(f"Failed: {result['error']}")
     
     if not results:
         print("\nNo models trained successfully!")
