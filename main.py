@@ -4,7 +4,7 @@ from src.training.train_sklearn import train_all_models_enhanced
 from src.training.train_lstm import train_lstm_on_all
 from src.training.train_gru import train_gru_on_all
 from src.data.loader import load_cir_data
-from src.utils.visualizations import plot_actual_vs_estimated
+from src.utils.visualizations import plot_actual_vs_estimated, plot_rmse_comparison
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -58,6 +58,7 @@ def run_analysis():
     
     # Create results directory if it doesn't exist
     os.makedirs('results/models', exist_ok=True)
+    os.makedirs('results/plots', exist_ok=True)
     
     # Generate timestamp for this run
     timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -116,11 +117,12 @@ def run_analysis():
     
     # Plot LSTM actual vs estimated
     if TRAINING_OPTIONS['save_predictions']:
-        print("\nPlotting LSTM actual vs estimated values...")
+        print("\nSaving LSTM actual vs estimated plots...")
         plot_actual_vs_estimated(
             np.array(lstm_results['r_actual']),
             np.array(lstm_results['r_pred']),
-            model_name="LSTM"
+            model_name="LSTM",
+            save_dir="results/plots"
         )
     
     # Save LSTM model
@@ -164,11 +166,12 @@ def run_analysis():
     
     # Plot GRU actual vs estimated
     if TRAINING_OPTIONS['save_predictions']:
-        print("\nPlotting GRU actual vs estimated values...")
+        print("\nSaving GRU actual vs estimated plots...")
         plot_actual_vs_estimated(
             np.array(gru_results['r_actual']),
             np.array(gru_results['r_pred']),
-            model_name="GRU"
+            model_name="GRU",
+            save_dir="results/plots"
         )
     
     # Save GRU model
@@ -230,11 +233,12 @@ def run_analysis():
             
             # Plot actual vs estimated for sklearn models
             if TRAINING_OPTIONS['save_predictions']:
-                print(f"\nPlotting {result['name']} actual vs estimated values...")
+                print(f"\nSaving {result['name']} actual vs estimated plots...")
                 plot_actual_vs_estimated(
                     result['y_test'],
                     result['y_pred'],
-                    model_name=result['name']
+                    model_name=result['name'],
+                    save_dir="results/plots"
                 )
             
             all_model_results.append({
@@ -247,9 +251,9 @@ def run_analysis():
                 } if TRAINING_OPTIONS['save_predictions'] else None
             })
     
-    # 4. Create visualization figures
-    if TRAINING_OPTIONS['plot_training_history']:
-        create_analysis_figures(all_model_results, df_all)
+    # Create RMSE comparison plot
+    print("\nSaving RMSE comparison plot...")
+    plot_rmse_comparison(all_model_results, save_dir="results/plots")
     
     # 5. Statistical Analysis and Results
     print("\n Results")
@@ -261,6 +265,7 @@ def run_analysis():
         save_analysis_results(all_model_results)
     
     print("\nAnalysis complete. All models saved in results/models/")
+    print("All plots saved in results/plots/")
 
 def create_analysis_figures(model_results, df_raw):
     # Figure 1: Model Performance Comparison

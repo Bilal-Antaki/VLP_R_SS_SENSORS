@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error
 from src.data.loader import load_cir_data
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 def create_aligned_comparison(processed_dir: str):
     """
@@ -176,18 +177,20 @@ def plot_model_results(pl_values, r_actual, r_pred_linear, r_pred_lstm, train_lo
     print("Warning: Using legacy plot function. Use plot_model_results_fixed(processed_dir) instead.")
     plot_model_results_fixed("data/processed")
 
-def plot_actual_vs_estimated(y_true, y_pred, model_name="Model"):
+def plot_actual_vs_estimated(y_true, y_pred, model_name="Model", save_dir="results/plots"):
     """
-    Create a scatter plot of actual vs estimated r values
+    Create and save scatter plots of actual vs estimated r values
     
     Args:
         y_true: Array of actual r values
         y_pred: Array of predicted r values
         model_name: Name of the model for the plot title
+        save_dir: Directory to save the plots
     """
-    plt.figure(figsize=(10, 8))
+    os.makedirs(save_dir, exist_ok=True)
     
     # Create scatter plot
+    plt.figure(figsize=(10, 8))
     plt.scatter(y_true, y_pred, alpha=0.6, label=f"{model_name} Predictions")
     
     # Add perfect prediction line
@@ -209,6 +212,51 @@ def plot_actual_vs_estimated(y_true, y_pred, model_name="Model"):
     plt.axis('equal')
     
     plt.tight_layout()
-    plt.show()
+    
+    # Save the plot
+    plt.savefig(os.path.join(save_dir, f"{model_name.lower()}_actual_vs_estimated.png"))
+    plt.close()
     
     return rmse
+
+def plot_rmse_comparison(model_results, save_dir="results/plots"):
+    """
+    Create and save a bar plot comparing RMSE values across all models
+    
+    Args:
+        model_results: List of dictionaries containing model results
+        save_dir: Directory to save the plot
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Sort results by RMSE for better visualization
+    sorted_results = sorted(model_results, key=lambda x: x['metrics']['rmse'])
+    
+    # Extract model names and RMSE values
+    model_names = [r['name'] for r in sorted_results]
+    rmse_values = [r['metrics']['rmse'] for r in sorted_results]
+    
+    # Create the plot
+    plt.figure(figsize=(12, 6))
+    bars = plt.barh(model_names, rmse_values)
+    
+    # Color code bars by model type
+    for i, result in enumerate(sorted_results):
+        if result['type'] == 'RNN':
+            bars[i].set_color('red')
+        else:
+            bars[i].set_color('blue')
+    
+    plt.xlabel('RMSE')
+    plt.title('Model Performance Comparison')
+    plt.grid(True, alpha=0.3)
+    
+    # Add RMSE values as text on the bars
+    for i, v in enumerate(rmse_values):
+        plt.text(v, i, f' {v:.4f}', va='center')
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plt.savefig(os.path.join(save_dir, "rmse_comparison.png"))
+    plt.close()

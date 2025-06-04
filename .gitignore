@@ -31,7 +31,7 @@ env/
 htmlcov/
 
 # Project specific
-results/
+results/models/
 *.log
 *.pkl
 *.h5
