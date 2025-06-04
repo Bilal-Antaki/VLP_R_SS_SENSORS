@@ -2,13 +2,17 @@
 Configuration settings for the Position Estimation project
 """
 
-# LSTM Model Configuration
+# Model Configuration
 MODEL_CONFIG = {
-    'hidden_dim': 128,
-    'num_layers': 3,
-    'dropout': 0.3,
+    'hidden_size': 256,        # Increased hidden size
+    'num_layers': 3,           # Increased number of layers
+    'dropout': 0.4,            # Increased dropout for better regularization
+    'sequence_length': 16,     # Increased sequence length for better temporal patterns
+    'batch_size': 64,          # Increased batch size for better training stability
+    'learning_rate': 0.001,    # Reduced learning rate for better convergence
+    'epochs': 200,             # Increased epochs with early stopping
+    'patience': 30             # Increased patience for early stopping
 }
-
 
 # GRU Model Configuration
 GRU_CONFIG = {
@@ -19,7 +23,6 @@ GRU_CONFIG = {
     'use_attention': False,   # Whether to add attention mechanism
     'attention_dim': 64,      # Dimension for attention layer if used
 }
-
 
 # Training Configuration
 TRAINING_CONFIG = {

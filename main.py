@@ -3,6 +3,7 @@ from src.config import DATA_CONFIG, ANALYSIS_CONFIG, TRAINING_OPTIONS
 from src.training.train_sklearn import train_all_models_enhanced
 from src.training.train_lstm import train_lstm_on_all
 from src.training.train_gru import train_gru_on_all
+from src.training.train_rnn import train_rnn_on_all
 from src.data.loader import load_cir_data
 from src.utils.visualizations import plot_actual_vs_estimated, plot_rmse_comparison
 import matplotlib.pyplot as plt
@@ -51,7 +52,7 @@ def create_predictions_dataframe(model_results):
 
 
 def run_analysis():
-    """Run analysis with Linear, SVR, and LSTM models"""
+    """Run analysis with Linear, SVR, LSTM, GRU, and RNN models"""
     print("=" * 80)
     print(" " * 20 + "COMPREHENSIVE POSITION ESTIMATION ANALYSIS")
     print("=" * 80)
@@ -209,6 +210,55 @@ def run_analysis():
         } if TRAINING_OPTIONS['plot_training_history'] else None
     })
     
+    # Train and save RNN model
+    print("\nTraining RNN model...")
+    rnn_results = train_rnn_on_all(DATA_CONFIG['processed_dir'])
+    
+    # Plot RNN actual vs estimated
+    if TRAINING_OPTIONS['save_predictions']:
+        print("\nSaving RNN actual vs estimated plots...")
+        plot_actual_vs_estimated(
+            np.array(rnn_results['r_actual']),
+            np.array(rnn_results['r_pred']),
+            model_name="RNN",
+            save_dir="results/plots"
+        )
+    
+    # Save RNN model
+    rnn_save_path = f'results/models/rnn_model_{timestamp}_rmse_{rnn_results["rmse"]:.4f}.pth'
+    torch.save({
+        'model_type': 'rnn',
+        'timestamp': timestamp,
+        'rmse': rnn_results['rmse'],
+        'train_loss': rnn_results['train_loss'],
+        'val_loss': rnn_results['val_loss'],
+        'predictions': {
+            'actual': rnn_results['r_actual'],
+            'predicted': rnn_results['r_pred']
+        }
+    }, rnn_save_path)
+    print(f"Saved RNN model to {rnn_save_path}")
+    
+    # Clear GPU memory after RNN
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    all_model_results.append({
+        'name': 'rnn',
+        'type': 'RNN',
+        'metrics': {
+            'rmse': rnn_results['rmse']
+        },
+        'predictions': {
+            'y_test': rnn_results['r_actual'],
+            'y_pred': rnn_results['r_pred']
+        } if TRAINING_OPTIONS['save_predictions'] else None,
+        'training_history': {
+            'train_loss': rnn_results['train_loss'],
+            'val_loss': rnn_results['val_loss']
+        } if TRAINING_OPTIONS['plot_training_history'] else None
+    })
+    
     # Train sklearn models
     print("\nTraining traditional ML models...")
     sklearn_results = train_all_models_enhanced(
@@ -326,6 +376,22 @@ def perform_statistical_analysis(model_results):
     # Sort results by RMSE for better readability
     sorted_results = sorted(model_results, key=lambda x: x['metrics']['rmse'])
     best_rmse = min(r['metrics']['rmse'] for r in model_results)
+    
+    # Print first 10 predictions from each model
+    print("\nFirst 10 predictions from each model:")
+    print("=" * 80)
+    
+    for result in sorted_results:
+        print(f"\n{result['name']} Model:")
+        print("-" * 40)
+        print("Actual\t\tPredicted")
+        print("-" * 40)
+        
+        if result.get('predictions'):
+            actual = result['predictions']['y_test']
+            predicted = result['predictions']['y_pred']
+            for a, p in zip(actual[:10], predicted[:10]):
+                print(f"{a:.2f}\t\t{p:.2f}")
     
     # Individual model results
     print("\nDetailed Model Results:")
