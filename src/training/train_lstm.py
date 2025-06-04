@@ -12,15 +12,16 @@ import random
 import time
 
 def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 300, lr: float = 0.01):
-    # Generate random seed based on current time
-    random_seed = int(time.time() * 1000) % 100000
-    print(f"Using random seed: {random_seed}")
+    # Set fixed random seed for reproducibility
+    random_seed = 42
+    print(f"Using fixed random seed: {random_seed}")
     
-    # Set random seeds
+    # Set random seeds for all sources of randomness
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = True
+    torch.cuda.manual_seed_all(random_seed)  # For multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
     

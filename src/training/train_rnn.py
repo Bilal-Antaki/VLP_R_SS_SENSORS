@@ -8,6 +8,7 @@ from src.config import MODEL_CONFIG, TRAINING_OPTIONS
 from src.data.loader import load_cir_data
 import time
 import os
+import random
 
 def create_sequences(X, y, seq_length):
     """Create sequences for RNN training with overlap for better data utilization"""
@@ -21,11 +22,18 @@ def train_rnn_on_all(processed_dir):
     """Train RNN model on all available data"""
     print("\nTraining RNN model...")
     
-    # Set random seed for reproducibility
-    seed = int(time.time()) % 10000
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    print(f"Using random seed: {seed}")
+    # Set fixed random seed for reproducibility
+    random_seed = 42
+    print(f"Using fixed random seed: {random_seed}")
+    
+    # Set random seeds for all sources of randomness
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)  # For multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)
     
     # Load data
     df = load_cir_data(processed_dir, filter_keyword='FCPR-D1')
