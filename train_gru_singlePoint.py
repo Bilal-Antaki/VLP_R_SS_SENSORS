@@ -52,17 +52,3 @@ y = df_engineered[DATA_CONFIG['target_column']]
 selected_features = select_features(X, y)
 print(f"  Selected {len(selected_features)} features from {len(feature_cols)} total")
 print(selected_features)
-
-for feat in selected_features:
-    if len(selected_features) >= 5:
-        break
-    if selected_features:
-        corrs = X[selected_features].corrwith(X[feat]).abs()
-        print(f"Trying {feat}, correlations with selected: {corrs.values}")
-        if (corrs > 0.9).any():
-            print(f"Skipping {feat} due to high correlation.")
-            continue
-    selected_features.append(feat)
-    print(f"Selected: {feat}")
-
-

@@ -198,16 +198,15 @@ def select_features(X, y, method='lasso', threshold=0.1, remove_intercorrelated=
     
     return selected_features
 
-def select_top_k_uncorrelated_features(X, y, method='correlation', k=5, threshold=0.1, corr_threshold=0.9):
+def select_top_k_features(X, y, method='correlation', k=5, threshold=0.1):
     """
-    Select the top k features by a method, ensuring low inter-correlation between selected features.
+    Select the top k features by a method, ignoring inter-correlation.
     Args:
         X: Feature DataFrame
         y: Target values
         method: 'correlation', 'mutual_info', 'rf', or 'lasso'
         k: number of features to select
         threshold: threshold for feature selection (importance/correlation)
-        corr_threshold: maximum allowed absolute correlation between selected features
     Returns:
         List of selected feature names
     """
@@ -241,16 +240,7 @@ def select_top_k_uncorrelated_features(X, y, method='correlation', k=5, threshol
     else:
         raise ValueError(f"Unknown method: {method}")
 
-    # Sort features by score, descending
+    # Sort features by score, descending, and select top k
     sorted_features = scores.sort_values(ascending=False).index.tolist()
-    selected = []
-    for feat in sorted_features:
-        if len(selected) >= k:
-            break
-        # Check correlation with already selected features
-        if selected:
-            corrs = X_numeric[selected].corrwith(X_numeric[feat]).abs()
-            if (corrs > corr_threshold).any():
-                continue  # skip if too correlated
-        selected.append(feat)
+    selected = sorted_features[:k]
     return selected
