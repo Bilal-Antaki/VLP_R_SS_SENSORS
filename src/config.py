@@ -50,11 +50,7 @@ DATA_CONFIG = {
 ANALYSIS_CONFIG = {
     'feature_selection': {
         'correlation_threshold': 0.3,
-        'excluded_features': [
-            'r', 'X', 'Y', 'source_file', 'radius', 'angle',
-            'manhattan_dist', 'quadrant', 'X_Y_ratio', 'Y_X_ratio',
-            'X_Y_product', 'X_normalized', 'Y_normalized'
-        ]
+        'excluded_features': ['r', 'X', 'Y']
     },
     'visualization': {
         'figure_sizes': {

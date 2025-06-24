@@ -7,15 +7,14 @@ from src.data.preprocessing import scale_and_sequence
 from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG
 import numpy as np
 import random
-import time
 
 class GRUModel(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=None, num_layers=None, dropout=None):
+    def __init__(self, input_dim=2, hidden_dim=GRU_CONFIG['hidden_dim'], num_layers=GRU_CONFIG['num_layers'], dropout=GRU_CONFIG['dropout']):
         super(GRUModel, self).__init__()
         # Use provided parameters or fall back to config values
-        self.hidden_dim = hidden_dim if hidden_dim is not None else GRU_CONFIG['hidden_dim']
-        self.num_layers = num_layers if num_layers is not None else GRU_CONFIG['num_layers']
-        self.dropout = dropout if dropout is not None else GRU_CONFIG['dropout']
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.dropout = dropout
         
         # GRU layer with matching LSTM architecture
         self.gru = nn.GRU(
@@ -23,7 +22,7 @@ class GRUModel(nn.Module):
             self.hidden_dim,
             num_layers=self.num_layers,
             batch_first=True,
-            dropout=self.dropout if self.num_layers > 1 else 0
+            dropout=self.dropout
         )
         
         # Complex output layer matching LSTM
