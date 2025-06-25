@@ -5,7 +5,7 @@ from src.training.train_sklearn import train_all_models_enhanced
 from src.training.train_lstm import train_lstm_on_all
 from src.training.train_gru import train_gru_on_all
 from src.training.train_rnn import train_rnn_on_all
-from src.data.loader import load_cir_data
+from src.data.data_loader import load_cir_data
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np

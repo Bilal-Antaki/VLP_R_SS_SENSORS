@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from src.models.rnn import SimpleRNN
 from src.config import MODEL_CONFIG, TRAINING_OPTIONS
-from src.data.loader import load_cir_data
+from src.data.data_loader import load_cir_data
 import time
 import os
 import random

@@ -43,10 +43,9 @@ Position_Estimation_Code/
 │   └── processed/     # Combined CIR CSV files
 ├── src/
 │   ├── data/
-│   │   ├── loader.py              # Data loading utilities
-│   │   ├── preprocessing.py       # Data preprocessing
-│   │   ├── data_processing.py     # Raw to CIR conversion
-│   │   └── feature_engineering.py # Feature creation
+│   │   ├── data_loader.py         # Combined loading and preprocessing (75 lines)
+│   │   ├── data_processing.py     # Raw to CIR conversion (68 lines)
+│   │   └── feature_engineering.py # Feature creation (187 lines)
 │   ├── models/
 │   │   ├── linear.py             # Linear models
 │   │   ├── svr.py                # Support Vector Regressors

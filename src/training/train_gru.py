@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
-from src.data.loader import load_cir_data
-from src.data.preprocessing import scale_and_sequence
-from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG
+from src.data.data_loader import load_cir_data, scale_and_sequence
+from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG, MODEL_CONFIG, TRAINING_OPTIONS
 import numpy as np
 import random
+from src.models.gru import GRU
 
 class GRUModel(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=GRU_CONFIG['hidden_dim'], num_layers=GRU_CONFIG['num_layers'], dropout=GRU_CONFIG['dropout']):

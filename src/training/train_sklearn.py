@@ -1,6 +1,6 @@
 # src/training/train_enhanced.py
 from sklearn.model_selection import train_test_split, cross_val_score
-from src.data.loader import load_cir_data, extract_features_and_target
+from src.data.data_loader import load_cir_data, extract_features_and_target
 from src.evaluation.metrics import calculate_all_metrics
 from sklearn.preprocessing import StandardScaler
 from src.models.model_registry import get_model
@@ -8,6 +8,7 @@ from src.config import DATA_CONFIG
 import numpy as np
 import warnings
 import time
+from sklearn.ensemble import RandomForestRegressor
 warnings.filterwarnings('ignore')
 
 def train_model_with_metrics(model_name, X_train, X_test, y_train, y_test, **model_kwargs):
