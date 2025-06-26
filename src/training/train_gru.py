@@ -64,8 +64,8 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
     # Set random seeds
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
     
@@ -78,9 +78,6 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
     
     # Scale and create sequences
     X_seq, y_seq, x_scaler, y_scaler = scale_and_sequence(df, seq_len=seq_len)
-    
-    if len(X_seq) < 100:
-        print(f"Warning: Very few sequences ({len(X_seq)}). Consider reducing seq_len.")
     
     # Split data using config validation split
     X_train, X_val, y_train, y_val = train_test_split(
@@ -143,6 +140,7 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
     
     train_loss_hist, val_loss_hist = [], []
     best_val_loss = float('inf')
+    best_model_state = None
     patience_counter = 0
     early_stop_patience = TRAINING_CONFIG.get('patience', 20)
     
@@ -203,6 +201,7 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
+            best_model_state = model.state_dict().copy()
         else:
             patience_counter += 1
         
@@ -210,6 +209,9 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
             print(f"Early stopping at epoch {epoch+1}")
             break
         
+        if best_model_state is not None:
+            model.load_state_dict(best_model_state)
+
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
             # Check prediction diversity

@@ -82,6 +82,7 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
     
     train_loss_hist, val_loss_hist = [], []
     best_val_loss = float('inf')
+    best_model_state = None
     patience_counter = 0
     early_stop_patience = 20
     
@@ -142,6 +143,7 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
+            best_model_state = model.state_dict().copy()
         else:
             patience_counter += 1
         
@@ -149,6 +151,9 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
             print(f"Early stopping at epoch {epoch+1}")
             break
         
+        if best_model_state is not None:
+            model.load_state_dict(best_model_state)
+
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
             # Check prediction diversity
