@@ -114,8 +114,6 @@ def select_features_rf(X, y, k=5):
     selected_features = importance.nlargest(k).index.tolist()
     
     print(f"Selected top {k} features by Random Forest:")
-    for i, feat in enumerate(selected_features, 1):
-        print(f"  {i}. {feat}: {importance[feat]:.4f}")
     
     return selected_features
 
@@ -163,6 +161,63 @@ def select_features_pca(X, y, variance_threshold=0.95):
     return component_names, X_pca[:, :n_components]
 
 # Convenience functions
+def select_features(X, y, method='rf', **kwargs):
+    """
+    Select features using specified method
+    
+    Args:
+        X: Feature DataFrame
+        y: Target values
+        method: 'rf' for Random Forest, 'pca' for PCA, 'correlation' for correlation-based
+        **kwargs: Additional arguments for the specific method
+        
+    Returns:
+        List of selected feature names or component names
+    """
+    if method.lower() == 'rf':
+        k = kwargs.get('k', 5)
+        return select_features_rf(X, y, k)
+    elif method.lower() == 'pca':
+        variance_threshold = kwargs.get('variance_threshold', 0.95)
+        return select_features_pca(X, y, variance_threshold)
+    elif method.lower() == 'correlation':
+        threshold = kwargs.get('threshold', 0.1)
+        return select_features_correlation(X, y, threshold)
+    else:
+        raise ValueError(f"Unknown method: {method}. Use 'rf', 'pca', or 'correlation'")
+
+def select_features_correlation(X, y, threshold=0.1):
+    """
+    Select features based on correlation with target
+    
+    Args:
+        X: Feature DataFrame
+        y: Target values
+        threshold: Minimum absolute correlation to include feature
+        
+    Returns:
+        List of selected feature names
+    """
+    # Get numeric features only
+    numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+    exclude_cols = ['X', 'Y', 'r', 'source_file']
+    numeric_cols = [col for col in numeric_cols if col not in exclude_cols]
+    
+    if len(numeric_cols) == 0:
+        raise ValueError("No valid features found")
+    
+    X_clean = X[numeric_cols].fillna(0)
+    
+    # Calculate correlations
+    correlations = X_clean.corrwith(y).abs()
+    selected_features = correlations[correlations >= threshold].index.tolist()
+    
+    print(f"Selected {len(selected_features)} features with correlation >= {threshold}:")
+    for feature in selected_features:
+        print(f"  {feature}: {correlations[feature]:.3f}")
+    
+    return selected_features
+
 def get_best_features_rf(df, target_col='r', k=5):
     """Get k best features using Random Forest"""
     X = df.drop([target_col], axis=1, errors='ignore')

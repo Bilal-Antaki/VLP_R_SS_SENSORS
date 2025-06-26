@@ -4,11 +4,11 @@ POSITION ESTIMATION ANALYSIS REPORT
 Model Performance Summary:
 ----------------------------------------
 
-Model: lstm (RNN)
-  RMSE: 171.5167
-
 Model: gru (RNN)
-  RMSE: 211.9258
+  RMSE: 331.8546
+
+Model: lstm (RNN)
+  RMSE: 352.1285
 
 Model: rnn (RNN)
   RMSE: 410.4797

@@ -1,3 +1,8 @@
+import sys
+import os
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -9,7 +14,6 @@ import numpy as np
 import pandas as pd
 import random
 import time
-from src.models.lstm import LSTM
 
 def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 300, lr: float = 0.01):
     # Set fixed random seed for reproducibility
@@ -153,31 +157,70 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
     
     # Generate predictions on full dataset
     model.eval()
+    all_val_preds = []
+    all_val_targets = []
+
     with torch.no_grad():
-        full_preds_scaled = model(X_seq.to(device)).cpu().numpy()
-        full_targets_scaled = y_seq.numpy()
-    
-    # Inverse transform
-    full_preds = y_scaler.inverse_transform(full_preds_scaled.reshape(-1, 1)).flatten()
-    full_targets = y_scaler.inverse_transform(full_targets_scaled.reshape(-1, 1)).flatten()
-    
-    rmse = np.sqrt(np.mean((full_targets - full_preds) ** 2))
-    
+        for X_batch, y_batch in val_loader:
+            X_batch = X_batch.to(device)
+            preds = model(X_batch).cpu().numpy()
+            all_val_preds.extend(preds)
+            all_val_targets.extend(y_batch.numpy())
+
+    # Convert to arrays and inverse transform
+    val_preds_scaled = np.array(all_val_preds)
+    val_targets_scaled = np.array(all_val_targets)
+
+    val_preds = y_scaler.inverse_transform(val_preds_scaled.reshape(-1, 1)).flatten()
+    val_targets = y_scaler.inverse_transform(val_targets_scaled.reshape(-1, 1)).flatten()
+
+    rmse = np.sqrt(np.mean((val_targets - val_preds) ** 2))
+
     print(f"\nFinal Metrics:")
     print(f"RMSE: {rmse:.4f}")
-    print(f"Prediction range: [{full_preds.min():.2f}, {full_preds.max():.2f}]")
-    print(f"Target range: [{full_targets.min():.2f}, {full_targets.max():.2f}]")
-    print(f"Prediction std: {np.std(full_preds):.4f}")
-    print(f"Target std: {np.std(full_targets):.4f}")
+    print(f"Prediction range: [{val_preds.min():.2f}, {val_preds.max():.2f}]")
+    print(f"Target range: [{val_targets.min():.2f}, {val_targets.max():.2f}]")
+    print(f"Prediction std: {np.std(val_preds):.4f}")
+    print(f"Target std: {np.std(val_targets):.4f}")
+
+    
+    # Save model with scalers for real-time inference
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    model_save_path = f'results/models/lstm_model_realtime_{timestamp}_rmse_{rmse:.4f}.pth'
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'model_config': {
+            'input_dim': 2,
+            'hidden_dim': 64,
+            'num_layers': 2,
+            'dropout': 0.2,
+            'seq_len': seq_len
+        },
+        'x_scaler': x_scaler,
+        'y_scaler': y_scaler,
+        'rmse': rmse,
+        'train_loss': train_loss_hist,
+        'val_loss': val_loss_hist,
+        'timestamp': timestamp,
+        'predictions': {
+            'actual': val_targets.tolist(),
+            'predicted': val_preds.tolist()
+        }
+    }, model_save_path)
+    
+    print(f"Model saved for real-time inference: {model_save_path}")
     
     # Return additional info for size alignment
     return {
-        'r_actual': full_targets.tolist(),
-        'r_pred': full_preds.tolist(),
-        'train_loss': train_loss_hist,
-        'val_loss': val_loss_hist,
-        'rmse': rmse,
-        'original_df_size': len(df),
-        'sequence_size': len(full_targets),
-        'seq_len': seq_len
-    }
+    'r_actual': val_targets.tolist(),
+    'r_pred': val_preds.tolist(),
+    'train_loss': train_loss_hist,
+    'val_loss': val_loss_hist,
+    'rmse': rmse,
+    'original_df_size': len(df),
+    'sequence_size': len(val_targets),  # Now this is validation size
+    'seq_len': seq_len
+}
+
+if __name__ == "__main__":
+    train_lstm_on_all(DATA_CONFIG['processed_dir'])

@@ -80,15 +80,17 @@ def run_analysis():
         print("No data found!")
         return
     
+    # Extract target column before feature engineering
+    y = df_all[DATA_CONFIG['target_column']]
+    
     # 2. Feature Engineering
-    df_engineered = create_engineered_features(df_all, include_categorical=True)
+    df_engineered = create_engineered_features(df_all)
     
     # Select features - exclude any coordinate-based features
     feature_cols = [col for col in df_engineered.columns 
                    if col not in ANALYSIS_CONFIG['feature_selection']['excluded_features']]
     
     X = df_engineered[feature_cols]
-    y = df_engineered[DATA_CONFIG['target_column']]
 
     # Select best features
     selected_features = select_features(

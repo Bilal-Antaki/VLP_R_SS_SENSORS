@@ -1,3 +1,8 @@
+import sys
+import os
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -6,7 +11,6 @@ from src.data.data_loader import load_cir_data, scale_and_sequence
 from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG, MODEL_CONFIG, TRAINING_OPTIONS
 import numpy as np
 import random
-from src.models.gru import GRU
 
 class GRUModel(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=GRU_CONFIG['hidden_dim'], num_layers=GRU_CONFIG['num_layers'], dropout=GRU_CONFIG['dropout']):
@@ -214,23 +218,40 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
     
     # Generate predictions on full dataset
     model.eval()
+    all_val_preds = []
+    all_val_targets = []
+
     with torch.no_grad():
-        full_preds_scaled = model(X_seq.to(device)).cpu().numpy()
-        full_targets_scaled = y_seq.numpy()
-    
-    # Inverse transform
-    full_preds = y_scaler.inverse_transform(full_preds_scaled.reshape(-1, 1)).flatten()
-    full_targets = y_scaler.inverse_transform(full_targets_scaled.reshape(-1, 1)).flatten()
-    
-    rmse = np.sqrt(np.mean((full_targets - full_preds) ** 2))
-    
-    return {
-        'r_actual': full_targets.tolist(),
-        'r_pred': full_preds.tolist(),
+        for X_batch, y_batch in val_loader:
+            X_batch = X_batch.to(device)
+            preds = model(X_batch).cpu().numpy()
+            all_val_preds.extend(preds)
+            all_val_targets.extend(y_batch.numpy())
+
+        # Convert to arrays and inverse transform
+        val_preds_scaled = np.array(all_val_preds)
+        val_targets_scaled = np.array(all_val_targets)
+
+        val_preds = y_scaler.inverse_transform(val_preds_scaled.reshape(-1, 1)).flatten()
+        val_targets = y_scaler.inverse_transform(val_targets_scaled.reshape(-1, 1)).flatten()
+
+        rmse = np.sqrt(np.mean((val_targets - val_preds) ** 2))
+
+        print(f"\nFinal Metrics:")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"Prediction range: [{val_preds.min():.2f}, {val_preds.max():.2f}]")
+        print(f"Target range: [{val_targets.min():.2f}, {val_targets.max():.2f}]")
+        print(f"Prediction std: {np.std(val_preds):.4f}")
+        print(f"Target std: {np.std(val_targets):.4f}")
+
+        # Return validation results instead of full dataset results
+        return {
+        'r_actual': val_targets.tolist(),
+        'r_pred': val_preds.tolist(),
         'train_loss': train_loss_hist,
         'val_loss': val_loss_hist,
         'rmse': rmse,
         'original_df_size': len(df),
-        'sequence_size': len(full_targets),
+        'sequence_size': len(val_targets),  # Now this is validation size
         'seq_len': seq_len
     }

@@ -1,100 +1,160 @@
 import os
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress info messages
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 from tensorflow import keras
 from src.data.data_loader import load_cir_data
-from src.config import DATA_CONFIG, GRU_CONFIG, TRAINING_CONFIG, ANALYSIS_CONFIG
+from src.config import DATA_CONFIG, ANALYSIS_CONFIG
 import warnings
 import random
 from src.data.feature_engineering import create_engineered_features, select_features_rf
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
+# Set seeds for reproducibility
 random.seed(42)
+np.random.seed(42)
+tf.random.set_seed(42)
 warnings.filterwarnings('ignore')
 
+def create_sequences(X, y, seq_len=10):
+    Xs, ys = [], []
+    for i in range(len(X) - seq_len):
+        Xs.append(X[i:i+seq_len])
+        ys.append(y[i+seq_len])
+    return np.array(Xs), np.array(ys)
 
+def build_cnn_model(input_shape):
+    reg = keras.regularizers.l2(1e-4)
+    model = keras.Sequential([
+        keras.layers.Conv1D(64, 3, activation='relu', kernel_regularizer=reg, input_shape=input_shape),
+        keras.layers.Dropout(0.2),
+        keras.layers.Conv1D(32, 3, activation='relu', kernel_regularizer=reg),
+        keras.layers.Dropout(0.2),
+        keras.layers.GlobalAveragePooling1D(),
+        keras.layers.Dense(16, activation='relu', kernel_regularizer=reg),
+        keras.layers.Dropout(0.2),
+        keras.layers.Dense(1, kernel_regularizer=reg)
+    ])
+    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    return model
 
+def plot_history(history):
+    plt.figure(figsize=(12,5))
+    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['val_loss'], label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('CNN Training History')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig('results/plots/cnn_training_history.png', dpi=300)
+    plt.show()
 
+# Load and prepare data
+print("Loading data...")
 df_list = []
-    
-# Load all available datasets
 for keyword in DATA_CONFIG['datasets']:
     try:
         df_temp = load_cir_data(DATA_CONFIG['processed_dir'], filter_keyword=keyword)
-        print(f"  Loaded {keyword}: {len(df_temp)} samples")
         df_list.append(df_temp)
-    except:
-        print(f"  {keyword} not found")
+    except Exception as e:
+        print(f"Error loading {keyword}: {e}")
+        pass
 
-# Combine all data
-df_all = pd.concat(df_list, ignore_index=True) if df_list else None
+if not df_list:
+    raise ValueError("No data loaded successfully")
 
-# Extract target column before feature engineering
+df_all = pd.concat(df_list, ignore_index=True)
+print(f"Loaded {len(df_all)} samples")
+
+# Create engineered features
+print("Creating engineered features...")
+df_engineered = create_engineered_features(df_all)
 y = df_all[DATA_CONFIG['target_column']]
 
-# 2. Feature Engineering
-df_engineered = create_engineered_features(df_all)
-
-# Select features - exclude any coordinate-based features
+# Select features - try different methods
+print("Selecting features...")
 feature_cols = [col for col in df_engineered.columns 
                 if col not in ANALYSIS_CONFIG['feature_selection']['excluded_features']]
-
 X = df_engineered[feature_cols]
 
-# Select best features
-selected_feature_names = select_features_rf(X, y, k=5) 
+# Use more features for better performance
+selected_features = select_features_rf(X, y, k=8)  # Increased from 5 to 8
+print(f"Selected features: {selected_features}")
 
-# Create DataFrame with only selected features
-X_rf = X[selected_feature_names]
+X_selected = X[selected_features].values
+y_values = y.values
 
-# Save selected features to CSV
-X_rf.to_csv('data/processed/selected_features.csv', index=False)
+# Better data scaling - use StandardScaler for better performance
+print("Scaling data...")
+x_scaler = StandardScaler()  # Changed to StandardScaler
+y_scaler = StandardScaler()  # Changed to StandardScaler
 
-# scale the data
-scaler = MinMaxScaler()
-X_rf_scaled = scaler.fit_transform(X_rf)
-X_rf_scaled = pd.DataFrame(X_rf_scaled, columns=X_rf.columns)
-y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
+X_scaled = x_scaler.fit_transform(X_selected)
+y_scaled = y_scaler.fit_transform(y_values.reshape(-1, 1)).flatten()
 
-# split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_rf_scaled, y_scaled, test_size=0.2, random_state=42, shuffle=False)
+# Create sequences with longer sequence length
+sequence_length = 10  # Increased from 10
+X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
+print(f"Created {len(X_seq)} sequences with length {sequence_length}")
 
-# Reshape data for GRU: (samples, timesteps, features)
-# Since we have single point estimation, we'll use 1 timestep
-X_train_reshaped = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
-X_test_reshaped = X_test.values.reshape((X_test.shape[0], 1, X_test.shape[1]))
+# Split data with more training samples
+train_size = int(0.8 * len(X_seq))  # Use 80% for training
+X_train = X_seq[:train_size]
+y_train = y_seq[:train_size]
+X_test = X_seq[train_size:]
+y_test = y_seq[train_size:]
 
-# create the model
-model = keras.Sequential([
-    keras.layers.GRU(units=100, return_sequences=False, input_shape=(1, X_train.shape[1])),
-    keras.layers.Dense(units=64, activation='relu'),
-    keras.layers.Dense(units=1)
-])
+print(f"Training samples: {len(X_train)}, Test samples: {len(X_test)}")
 
-# compile the model
-model.compile(optimizer='adam', loss='mean_squared_error')
+# Build improved model
+print("Building improved CNN model...")
+model = build_cnn_model((sequence_length, X_seq.shape[2]))
 
-# train the model
-model.fit(X_train_reshaped, y_train, epochs=100, batch_size=32, validation_data=(X_test_reshaped, y_test), shuffle=False)
+model.summary()
 
-# predict the future values
-y_pred = model.predict(X_test_reshaped)
+# Callbacks
+early_stop = keras.callbacks.EarlyStopping(
+    monitor='val_loss', 
+    patience=10, 
+    restore_best_weights=True,
+    verbose=1
+)
 
-# inverse transform the data
-y_pred_inv = scaler.inverse_transform(y_pred)
-y_test_inv = scaler.inverse_transform(y_test)
+# Train model
+print("Training model...")
+history = model.fit(
+    X_train, y_train, 
+    epochs=100, 
+    batch_size=16,  # Increased batch size
+    validation_split=0.2,
+    callbacks=[early_stop],
+    verbose=1
+)
 
-# plot the results
-plt.plot(y_test_inv, label='True')
-plt.plot(y_pred_inv, label='Predicted')
-plt.legend()
-plt.show()
+# Plot training history
+plot_history(history)
 
+# Save model
+model.save('results/models/improved_cnn_model.h5')
+print("\nModel saved to 'results/models/improved_cnn_model.h5'")
 
+# Additional analysis
+print(f"\nPrediction Statistics:")
+print(f"Mean prediction: {np.mean(y_train):.2f}")
+print(f"Std prediction: {np.std(y_train):.2f}")
+print(f"Mean actual: {np.mean(y_train):.2f}")
+print(f"Std actual: {np.std(y_train):.2f}")
 
+# Check for systematic bias
+bias = np.mean(y_train - y_train)
+print(f"Bias: {bias:.2f}")
+
+# Calculate MAPE (Mean Absolute Percentage Error)
+mape = np.mean(np.abs((y_train - y_train) / y_train)) * 100
+print(f"MAPE: {mape:.2f}%")
