@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from src.models.model_registry import get_model
 from src.data.data_loader import load_cir_data, scale_and_sequence
-from src.config import DATA_CONFIG, MODEL_CONFIG, TRAINING_OPTIONS
+from src.config import DATA_CONFIG, MODEL_CONFIG, TRAINING_OPTIONS, TRAINING_CONFIG
 import numpy as np
 import pandas as pd
 import random
@@ -17,7 +17,7 @@ import time
 
 def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 300, lr: float = 0.01):
     # Set fixed random seed for reproducibility
-    random_seed = 42
+    random_seed = TRAINING_CONFIG['random_seed']
     print(f"Using fixed random seed: {random_seed}")
     
     # Set random seeds for all sources of randomness
@@ -151,15 +151,15 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
             print(f"Early stopping at epoch {epoch+1}")
             break
         
-        if best_model_state is not None:
-            model.load_state_dict(best_model_state)
-
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
             # Check prediction diversity
             pred_std = np.std(y_val_pred)
             print(f"  Prediction std: {pred_std:.6f}")
     
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+
     # Generate predictions on full dataset
     model.eval()
     all_val_preds = []
@@ -226,6 +226,3 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
     'sequence_size': len(val_targets),  # Now this is validation size
     'seq_len': seq_len
 }
-
-if __name__ == "__main__":
-    train_lstm_on_all(DATA_CONFIG['processed_dir'])

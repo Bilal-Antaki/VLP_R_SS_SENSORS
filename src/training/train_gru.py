@@ -193,10 +193,6 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
         scheduler.step(val_loss)
         new_lr = optimizer.param_groups[0]['lr']
         
-        # Manual verbose output for learning rate changes
-        if new_lr != prev_lr:
-            print(f"  Learning rate reduced from {prev_lr:.6f} to {new_lr:.6f}")
-        
         # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -208,16 +204,14 @@ def train_gru_on_all(processed_dir: str, batch_size: int = None, epochs: int = N
         if patience_counter >= early_stop_patience:
             print(f"Early stopping at epoch {epoch+1}")
             break
-        
-        if best_model_state is not None:
-            model.load_state_dict(best_model_state)
 
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
             # Check prediction diversity
             pred_std = np.std(y_val_pred)
             print(f"  Prediction std: {pred_std:.6f}")
-    
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
     # Generate predictions on full dataset
     model.eval()
     all_val_preds = []

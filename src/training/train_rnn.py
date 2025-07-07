@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from src.models.rnn import SimpleRNN
-from src.config import MODEL_CONFIG, TRAINING_OPTIONS
+from src.config import MODEL_CONFIG, TRAINING_OPTIONS, TRAINING_CONFIG
 from src.data.data_loader import load_cir_data
 import time
 import os
@@ -23,7 +23,7 @@ def train_rnn_on_all(processed_dir):
     print("\nTraining RNN model...")
     
     # Set fixed random seed for reproducibility
-    random_seed = 42
+    random_seed = TRAINING_CONFIG['random_seed']
     print(f"Using fixed random seed: {random_seed}")
     
     # Set random seeds for all sources of randomness
@@ -193,29 +193,38 @@ def train_rnn_on_all(processed_dir):
     checkpoint = torch.load('results/models/best_rnn_model.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    
-    # Make predictions on validation set
+
+    # Evaluate on validation set only (not full dataset)
+    all_val_preds = []
+    all_val_targets = []
     with torch.no_grad():
-        y_pred = model(X_val.to(device)).cpu().numpy()
-    
-    # Inverse transform predictions
-    y_pred = y_scaler.inverse_transform(y_pred)
-    y_val_orig = y_scaler.inverse_transform(y_val.numpy())
-    
-    # Calculate RMSE
-    rmse = np.sqrt(np.mean((y_val_orig - y_pred) ** 2))
-    
+        for X_batch, y_batch in val_loader:
+            X_batch = X_batch.to(device)
+            preds = model(X_batch).cpu().numpy()
+            all_val_preds.extend(preds)
+            all_val_targets.extend(y_batch.cpu().numpy())
+
+    # Convert to arrays and inverse transform
+    val_preds_scaled = np.array(all_val_preds)
+    val_targets_scaled = np.array(all_val_targets)
+    val_preds = y_scaler.inverse_transform(val_preds_scaled.reshape(-1, 1)).flatten()
+    val_targets = y_scaler.inverse_transform(val_targets_scaled.reshape(-1, 1)).flatten()
+
+    rmse = np.sqrt(np.mean((val_targets - val_preds) ** 2))
+
     print("\nFinal Metrics:")
     print(f"RMSE: {rmse:.4f}")
-    print(f"Prediction range: [{y_pred.min():.2f}, {y_pred.max():.2f}]")
-    print(f"Target range: [{y_val_orig.min():.2f}, {y_val_orig.max():.2f}]")
-    print(f"Prediction std: {y_pred.std():.4f}")
-    print(f"Target std: {y_val_orig.std():.4f}")
-    
+    print(f"Prediction range: [{val_preds.min():.2f}, {val_preds.max():.2f}]")
+    print(f"Target range: [{val_targets.min():.2f}, {val_targets.max():.2f}]")
+    print(f"Prediction std: {np.std(val_preds):.4f}")
+    print(f"Target std: {np.std(val_targets):.4f}")
+
     return {
         'rmse': rmse,
         'train_loss': train_losses,
         'val_loss': val_losses,
-        'r_actual': y_val_orig.flatten(),
-        'r_pred': y_pred.flatten()
+        'r_actual': val_targets.flatten(),
+        'r_pred': val_preds.flatten(),
+        'original_df_size': len(df),
+        'sequence_size': len(val_targets),  # Now this is validation size
     } 

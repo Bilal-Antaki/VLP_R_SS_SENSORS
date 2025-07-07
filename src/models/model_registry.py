@@ -2,8 +2,7 @@
 from .linear import build_linear_model_simple
 from .svr import build_svr_model, build_svr_optimized
 from .lstm import build_lstm_model
-from .gru import build_gru_model, build_gru_with_attention, build_gru_bidirectional, build_gru_residual
-#from .lstm_2 import build_lstm_model_2
+from .gru import build_gru_model, build_gru_residual
 
 
 MODEL_REGISTRY = {
@@ -17,8 +16,6 @@ MODEL_REGISTRY = {
     # RNN models
     "lstm": build_lstm_model,
     "gru": build_gru_model,
-    "gru_attention": build_gru_with_attention,
-    "gru_bidirectional": build_gru_bidirectional,
     "gru_residual": build_gru_residual,
     #"lstm_2": build_lstm_model_2,
 }
@@ -27,7 +24,7 @@ MODEL_REGISTRY = {
 categories = {
     'Linear': ['linear'],
     'SVM': ['svr'],
-    'RNN': ['lstm', 'gru', 'gru_attention', 'gru_bidirectional', 'gru_residual']
+    'RNN': ['lstm', 'gru', 'gru_residual']
 }
 
 
