@@ -4,28 +4,28 @@ Configuration settings for the Position Estimation project
 
 # Model Configuration
 MODEL_CONFIG = {
-    'hidden_size': 256,        # Increased hidden size
-    'num_layers': 3,           # Increased number of layers
-    'dropout': 0.4,            # Increased dropout for better regularization
-    'sequence_length': 16,     # Increased sequence length for better temporal patterns
-    'batch_size': 64,          # Increased batch size for better training stability
-    'learning_rate': 0.001,    # Reduced learning rate for better convergence
-    'epochs': 200,             # Increased epochs with early stopping
-    'patience': 30             # Increased patience for early stopping
+    'hidden_size': 64,
+    'num_layers': 2,
+    'dropout': 0.2,
+    'sequence_length': 10,
+    'batch_size': 32,
+    'learning_rate': 0.001,
+    'epochs': 100,
+    'patience': 20
 }
 
 # GRU Model Configuration
 GRU_CONFIG = {
-    'hidden_dim': 64,        # Hidden dimension for GRU cells
-    'num_layers': 2,          # Number of GRU layers
-    'dropout': 0.3           # Dropout rate between layers
+    'hidden_dim': 64,
+    'num_layers': 2,
+    'dropout': 0.2
 }
 
 # Training Configuration
 TRAINING_CONFIG = {
     'learning_rate': 0.001,
-    'batch_size': 8,
-    'epochs': 300,
+    'batch_size': 32,
+    'epochs': 100,
     'weight_decay': 1e-5,
     'validation_split': 0.2,
     'random_seed': 42
@@ -40,10 +40,11 @@ FEATURE_CONFIG = {
 
 # Data Processing Configuration
 DATA_CONFIG = {
-    'input_file': 'data/processed/FCPR-D1_CIR.csv',
+    'input_file': 'data/processed/FCPR_CIR.csv',
     'target_column': 'r',
+    'feature_columns': ['PL_1', 'RMS_1', 'PL_2', 'RMS_2', 'PL_3', 'RMS_3'],
     'processed_dir': 'data/processed',
-    'datasets': ['FCPR-D1']
+    'datasets': ['FCPR']
 }
 
 # Analysis Configuration
@@ -68,9 +69,7 @@ ANALYSIS_CONFIG = {
     }
 }
 
-# Model Training Options
+# Training Options
 TRAINING_OPTIONS = {
-    'include_slow_models': True,  # Whether to include computationally intensive models
-    'save_predictions': True,      # Whether to save model predictions
-    'plot_training_history': True  # Whether to plot training history for applicable models
+    'save_predictions': True
 }

@@ -15,67 +15,54 @@ import pandas as pd
 import random
 import time
 
-def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 300, lr: float = 0.01):
-    # Set fixed random seed for reproducibility
+def train_lstm_on_all(processed_dir: str):
+    """Train LSTM model for position estimation"""
+    
+    # Set random seed for reproducibility
     random_seed = TRAINING_CONFIG['random_seed']
-    print(f"Using fixed random seed: {random_seed}")
-    
-    # Set random seeds for all sources of randomness
     torch.manual_seed(random_seed)
-    torch.cuda.manual_seed(random_seed)
-    torch.cuda.manual_seed_all(random_seed)  # For multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
-    random.seed(random_seed)
     
-    # Use longer sequences for better temporal patterns
-    seq_len = 10
+    seq_len = MODEL_CONFIG['sequence_length']
     
-    # Load data using dataset from config
-    df = load_cir_data(processed_dir, filter_keyword=DATA_CONFIG['datasets'][0])
-    print(f"Loaded {len(df)} data points from {DATA_CONFIG['datasets'][0]}")
-    
-    # Check data distribution
-    print(f"Target (r) statistics:")
-    print(f"  Mean: {df['r'].mean():.2f}")
-    print(f"  Std: {df['r'].std():.2f}")
+    # Load data
+    df = load_cir_data(processed_dir)
+    print(f"Loaded {len(df)} data points")
     
     # Scale and create sequences
     X_seq, y_seq, x_scaler, y_scaler = scale_and_sequence(df, seq_len=seq_len)
     
-    if len(X_seq) < 100:
-        print(f"Warning: Very few sequences ({len(X_seq)}). Consider reducing seq_len.")
-    
     # Split data
     X_train, X_val, y_train, y_val = train_test_split(
-        X_seq, y_seq, test_size=0.2, random_state=42, shuffle=True
+        X_seq, y_seq, test_size=TRAINING_CONFIG['validation_split'], 
+        random_state=random_seed, shuffle=True
     )
     
     # Create data loaders
     train_loader = DataLoader(
         TensorDataset(X_train, y_train), 
-        batch_size=batch_size, 
+        batch_size=TRAINING_CONFIG['batch_size'], 
         shuffle=True,
-        drop_last=True  # Ensure consistent batch sizes
+        drop_last=True
     )
     val_loader = DataLoader(
         TensorDataset(X_val, y_val), 
-        batch_size=batch_size,
+        batch_size=TRAINING_CONFIG['batch_size'],
         drop_last=False
     )
     
-    # Create model with better architecture
-    model = get_model("lstm", input_dim=2, hidden_dim=64, num_layers=2, dropout=0.2)
+    # Create model - 6 features now
+    model = get_model("lstm", input_dim=6, hidden_dim=MODEL_CONFIG['hidden_size'], 
+                     num_layers=MODEL_CONFIG['num_layers'], dropout=MODEL_CONFIG['dropout'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
     print(f"Using device: {device}")
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
     
     # Loss and optimizer
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=TRAINING_CONFIG['learning_rate'], 
+                               weight_decay=TRAINING_CONFIG['weight_decay'])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=10
     )
@@ -84,9 +71,8 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
     best_val_loss = float('inf')
     best_model_state = None
     patience_counter = 0
-    early_stop_patience = 20
     
-    for epoch in range(epochs):
+    for epoch in range(TRAINING_CONFIG['epochs']):
         # Training
         model.train()
         train_loss = 0
@@ -113,7 +99,6 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
         model.eval()
         val_loss = 0
         val_batches = 0
-        y_val_actual, y_val_pred = [], []
         
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
@@ -122,22 +107,13 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
                 loss = criterion(preds, y_batch)
                 val_loss += loss.item()
                 val_batches += 1
-                
-                y_val_actual.extend(y_batch.cpu().numpy())
-                y_val_pred.extend(preds.cpu().numpy())
         
         val_loss /= val_batches
         train_loss_hist.append(train_loss)
         val_loss_hist.append(val_loss)
         
         # Learning rate scheduling
-        prev_lr = optimizer.param_groups[0]['lr']
         scheduler.step(val_loss)
-        new_lr = optimizer.param_groups[0]['lr']
-        
-        # Manual verbose output for learning rate changes
-        if new_lr != prev_lr:
-            print(f"  Learning rate reduced from {prev_lr:.6f} to {new_lr:.6f}")
         
         # Early stopping
         if val_loss < best_val_loss:
@@ -147,20 +123,18 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
         else:
             patience_counter += 1
         
-        if patience_counter >= early_stop_patience:
+        if patience_counter >= MODEL_CONFIG['patience']:
             print(f"Early stopping at epoch {epoch+1}")
             break
         
-        if (epoch + 1) % 10 == 0 or epoch == 0:
+        if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
-            # Check prediction diversity
-            pred_std = np.std(y_val_pred)
-            print(f"  Prediction std: {pred_std:.6f}")
     
+    # Load best model
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
 
-    # Generate predictions on full dataset
+    # Generate predictions on validation set
     model.eval()
     all_val_preds = []
     all_val_targets = []
@@ -181,48 +155,12 @@ def train_lstm_on_all(processed_dir: str, batch_size: int = 32, epochs: int = 30
 
     rmse = np.sqrt(np.mean((val_targets - val_preds) ** 2))
 
-    print(f"\nFinal Metrics:")
-    print(f"RMSE: {rmse:.4f}")
-    print(f"Prediction range: [{val_preds.min():.2f}, {val_preds.max():.2f}]")
-    print(f"Target range: [{val_targets.min():.2f}, {val_targets.max():.2f}]")
-    print(f"Prediction std: {np.std(val_preds):.4f}")
-    print(f"Target std: {np.std(val_targets):.4f}")
-
+    print(f"LSTM RMSE: {rmse:.4f}")
     
-    # Save model with scalers for real-time inference
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    model_save_path = f'results/models/lstm_model_realtime_{timestamp}_rmse_{rmse:.4f}.pth'
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'model_config': {
-            'input_dim': 2,
-            'hidden_dim': 64,
-            'num_layers': 2,
-            'dropout': 0.2,
-            'seq_len': seq_len
-        },
-        'x_scaler': x_scaler,
-        'y_scaler': y_scaler,
-        'rmse': rmse,
+    return {
+        'r_actual': val_targets.tolist(),
+        'r_pred': val_preds.tolist(),
         'train_loss': train_loss_hist,
         'val_loss': val_loss_hist,
-        'timestamp': timestamp,
-        'predictions': {
-            'actual': val_targets.tolist(),
-            'predicted': val_preds.tolist()
-        }
-    }, model_save_path)
-    
-    print(f"Model saved for real-time inference: {model_save_path}")
-    
-    # Return additional info for size alignment
-    return {
-    'r_actual': val_targets.tolist(),
-    'r_pred': val_preds.tolist(),
-    'train_loss': train_loss_hist,
-    'val_loss': val_loss_hist,
-    'rmse': rmse,
-    'original_df_size': len(df),
-    'sequence_size': len(val_targets),  # Now this is validation size
-    'seq_len': seq_len
-}
+        'rmse': rmse
+    }

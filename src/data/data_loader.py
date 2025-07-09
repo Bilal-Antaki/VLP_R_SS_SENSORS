@@ -3,54 +3,56 @@ import os
 import numpy as np
 import torch
 from sklearn.preprocessing import StandardScaler
+from ..config import DATA_CONFIG
 
 def load_cir_data(processed_dir: str, filter_keyword: str = None) -> pd.DataFrame:
-    all_data = []
-    for file in os.listdir(processed_dir):
-        if file.endswith('_CIR.csv') and (filter_keyword is None or filter_keyword in file):
-            filepath = os.path.join(processed_dir, file)
-            df = pd.read_csv(filepath)
-            df['source_file'] = file
-            all_data.append(df)
-    if not all_data:
-        raise FileNotFoundError(f"No matching CIR files in {processed_dir}")
-    return pd.concat(all_data, ignore_index=True)
+    """Load CIR data from processed directory"""
+    filepath = os.path.join(processed_dir, DATA_CONFIG['input_file'].split('/')[-1])
+    if os.path.exists(filepath):
+        df = pd.read_csv(filepath)
+        print(f"Loaded {len(df)} data points from {filepath}")
+        return df
+    else:
+        raise FileNotFoundError(f"File not found: {filepath}")
 
-def extract_features_and_target(df: pd.DataFrame, features=['PL', 'RMS'], target='r'):
+def extract_features_and_target(df: pd.DataFrame):
+    """Extract features and target from DataFrame"""
+    features = DATA_CONFIG['feature_columns']
+    target = DATA_CONFIG['target_column']
+    
+    # Check if all required columns exist
+    missing_cols = [col for col in features + [target] if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing columns in data: {missing_cols}")
+    
     X = df[features]
     y = df[target]
     return X, y
 
 def sequence_split(X, y, seq_len):
-    """Create sequences for LSTM training"""
+    """Create sequences for RNN training"""
     X_seq, y_seq = [], []
-    for i in range(len(X) - seq_len + 1):  # Fixed off-by-one error
+    for i in range(len(X) - seq_len + 1):
         X_seq.append(X[i:i+seq_len])
-        y_seq.append(y[i+seq_len-1])  # Predict current timestep, not future
+        y_seq.append(y[i+seq_len-1])
     return np.array(X_seq), np.array(y_seq)
 
-def scale_and_sequence(df, seq_len=10, features=['PL', 'RMS'], target='r'):
-    """Improved scaling and sequencing for LSTM"""
+def scale_and_sequence(df, seq_len=10):
+    """Scale features and create sequences for RNN models"""
+    X, y = extract_features_and_target(df)
     
-    # Sort by position to ensure temporal consistency
-    df_sorted = df.copy()
+    X = X.values
+    y = y.values
     
-    X = df_sorted[features].values
-    y = df_sorted[target].values
-    
-    # Use StandardScaler instead of MinMaxScaler for better gradient flow
+    # Use StandardScaler for better gradient flow
     x_scaler = StandardScaler()
     y_scaler = StandardScaler()
     
-    # Fit scalers
     X_scaled = x_scaler.fit_transform(X)
     y_scaled = y_scaler.fit_transform(y.reshape(-1, 1)).flatten()
     
-    # Check for data issues
     print(f"Original y (r) range: [{y.min():.3f}, {y.max():.3f}]")
     print(f"Data shape: X={X_scaled.shape}, y={y_scaled.shape}")
-    print(f"Scaled X range: [{X_scaled.min():.3f}, {X_scaled.max():.3f}]")
-    print(f"Scaled y range: [{y_scaled.min():.3f}, {y_scaled.max():.3f}]")
     
     # Create sequences
     X_seq, y_seq = sequence_split(X_scaled, y_scaled, seq_len)
@@ -64,10 +66,12 @@ def scale_and_sequence(df, seq_len=10, features=['PL', 'RMS'], target='r'):
         y_scaler
     )
 
-def scale_features_only(df, features=['PL', 'RMS'], target='r'):
+def scale_features_only(df):
     """Simple scaling without sequencing for linear models"""
-    X = df[features].values
-    y = df[target].values
+    X, y = extract_features_and_target(df)
+    
+    X = X.values
+    y = y.values
     
     x_scaler = StandardScaler()
     X_scaled = x_scaler.fit_transform(X)

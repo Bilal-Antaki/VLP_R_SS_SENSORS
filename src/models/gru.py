@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from ..config import GRU_CONFIG
 
 class GRURegressor(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=None, num_layers=None, dropout=None):
+    def __init__(self, input_dim=6, hidden_dim=None, num_layers=None, dropout=None):
         super(GRURegressor, self).__init__()
         
         # Use provided parameters or fall back to config values
@@ -23,9 +23,6 @@ class GRURegressor(nn.Module):
         
         # Output layers
         self.fc = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(self.dropout),
             nn.Linear(self.hidden_dim, self.hidden_dim // 2),
             nn.ReLU(),
             nn.Dropout(self.dropout),
@@ -37,13 +34,8 @@ class GRURegressor(nn.Module):
 
     def forward(self, x):
         # x: [batch, seq_len, input_dim]
-        batch_size = x.size(0)
-        
-        # GRU forward pass
-        gru_out, hidden = self.gru(x)
-        # gru_out: [batch, seq_len, hidden_dim]
-        
-        # Use the last timestep output (standard approach)
+        gru_out, _ = self.gru(x)
+        # Use the last timestep output
         last_output = gru_out[:, -1, :]  # [batch, hidden_dim]
         
         # Apply layer normalization
@@ -66,7 +58,7 @@ class GRURegressor(nn.Module):
 
 class GRUWithResidual(GRURegressor):
     """GRU with residual connections for deeper networks"""
-    def __init__(self, input_dim=2, **kwargs):
+    def __init__(self, input_dim=6, **kwargs):
         super(GRUWithResidual, self).__init__(input_dim, **kwargs)
         
         # Add a projection layer for residual connection if dimensions don't match

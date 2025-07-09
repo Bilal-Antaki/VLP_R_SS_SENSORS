@@ -5,40 +5,29 @@ import warnings
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from ..config import DATA_CONFIG
 
 warnings.filterwarnings('ignore')
 
 def create_engineered_features(df):
     """
-    Create engineered features from PL and RMS
+    Return DataFrame with only the required features - no engineering needed
     
     Args:
-        df: Input DataFrame with PL and RMS columns
+        df: Input DataFrame
         
     Returns:
-        DataFrame with engineered features
+        DataFrame with required features only
     """
-    if 'PL' not in df.columns or 'RMS' not in df.columns:
-        print("Warning: PL and/or RMS columns not found. Returning original DataFrame.")
-        return df
+    required_cols = DATA_CONFIG['feature_columns'] + [DATA_CONFIG['target_column']]
     
-    feature_df = df.copy()
+    # Check if all required columns exist
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
     
-    # Clean base features
-    feature_df['PL'] = pd.to_numeric(feature_df['PL'], errors='coerce').round(3)
-    feature_df['RMS'] = pd.to_numeric(feature_df['RMS'], errors='coerce').round(3)
-    
-    # Create features
-    _create_features(feature_df)
-    
-    # Remove coordinate columns to prevent data leakage
-    coordinate_cols = ['X', 'Y', 'r']
-    for col in coordinate_cols:
-        if col in feature_df.columns:
-            feature_df = feature_df.drop(col, axis=1)
-    
-    print(f"Created {len(feature_df.columns)} total features")
-    return feature_df
+    # Return only the required columns
+    return df[required_cols].copy()
 
 def _create_features(feature_df):
     """Create all engineered features"""
@@ -161,30 +150,20 @@ def select_features_pca(X, y, variance_threshold=0.95):
     return component_names, X_pca[:, :n_components]
 
 # Convenience functions
-def select_features(X, y, method='rf', **kwargs):
+def select_features(X, y, method='all', **kwargs):
     """
-    Select features using specified method
+    Return all available features - no selection needed
     
     Args:
         X: Feature DataFrame
-        y: Target values
-        method: 'rf' for Random Forest, 'pca' for PCA, 'correlation' for correlation-based
-        **kwargs: Additional arguments for the specific method
+        y: Target values (not used)
+        method: Method for selection (not used)
+        **kwargs: Additional arguments (not used)
         
     Returns:
-        List of selected feature names or component names
+        List of all feature names
     """
-    if method.lower() == 'rf':
-        k = kwargs.get('k', 5)
-        return select_features_rf(X, y, k)
-    elif method.lower() == 'pca':
-        variance_threshold = kwargs.get('variance_threshold', 0.95)
-        return select_features_pca(X, y, variance_threshold)
-    elif method.lower() == 'correlation':
-        threshold = kwargs.get('threshold', 0.1)
-        return select_features_correlation(X, y, threshold)
-    else:
-        raise ValueError(f"Unknown method: {method}. Use 'rf', 'pca', or 'correlation'")
+    return list(X.columns)
 
 def select_features_correlation(X, y, threshold=0.1):
     """

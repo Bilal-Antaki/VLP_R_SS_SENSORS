@@ -3,10 +3,10 @@ import torch.nn as nn
 from ..config import MODEL_CONFIG
 
 class LSTMRegressor(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=None, num_layers=None, dropout=None):
+    def __init__(self, input_dim=6, hidden_dim=None, num_layers=None, dropout=None):
         super(LSTMRegressor, self).__init__()
         # Use provided parameters or fall back to config values
-        self.hidden_dim = hidden_dim if hidden_dim is not None else MODEL_CONFIG['hidden_dim']
+        self.hidden_dim = hidden_dim if hidden_dim is not None else MODEL_CONFIG['hidden_size']
         self.num_layers = num_layers if num_layers is not None else MODEL_CONFIG['num_layers']
         self.dropout = dropout if dropout is not None else MODEL_CONFIG['dropout']
         
