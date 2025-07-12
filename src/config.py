@@ -4,28 +4,28 @@ Configuration settings for the Position Estimation project
 
 # Model Configuration
 MODEL_CONFIG = {
-    'hidden_size': 64,
+    'hidden_size': 100,
     'num_layers': 2,
-    'dropout': 0.2,
+    'dropout': 0.3,
     'sequence_length': 10,
     'batch_size': 32,
     'learning_rate': 0.001,
-    'epochs': 100,
-    'patience': 20
+    'epochs': 300,
+    'patience': 30
 }
 
 # GRU Model Configuration
 GRU_CONFIG = {
     'hidden_dim': 64,
     'num_layers': 2,
-    'dropout': 0.2
+    'dropout': 0.3
 }
 
 # Training Configuration
 TRAINING_CONFIG = {
     'learning_rate': 0.001,
     'batch_size': 32,
-    'epochs': 100,
+    'epochs': 300,
     'weight_decay': 1e-5,
     'validation_split': 0.2,
     'random_seed': 42
