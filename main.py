@@ -12,8 +12,8 @@ def run_analysis():
     
     all_results = []
     
-    # Train sklearn models with hyperparameter tuning
-    sklearn_results = train_all_sklearn_models(DATA_CONFIG['processed_dir'], tune_hyperparams=True)
+    # Train sklearn models
+    sklearn_results = train_all_sklearn_models(DATA_CONFIG['processed_dir'])
     for result in sklearn_results:
         plot_actual_vs_estimated(
             result['y_test'],

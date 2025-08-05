@@ -1,6 +1,6 @@
 from sklearn.model_selection import train_test_split
 from src.data.data_loader import load_cir_data, scale_and_sequence
-from src.config import TRAINING_CONFIG
+from src.config import TRAINING_CONFIG, GRU_CONFIG, LSTM_CONFIG, RNN_CONFIG, DATA_CONFIG
 from src.evaluation.metrics import calculate_rmse, time_execution
 import torch
 import torch.nn as nn
@@ -8,7 +8,7 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 
 class LSTMRegressor(nn.Module):
-    def __init__(self, input_dim=6, hidden_dim=100, num_layers=2, dropout=0.3):
+    def __init__(self, input_dim, hidden_dim, num_layers, dropout):
         super().__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.fc = nn.Sequential(nn.Linear(hidden_dim, hidden_dim // 2), nn.ReLU(), nn.Dropout(dropout), nn.Linear(hidden_dim // 2, 1))
@@ -18,7 +18,7 @@ class LSTMRegressor(nn.Module):
         return self.fc(lstm_out[:, -1, :]).squeeze(-1)
 
 class GRURegressor(nn.Module):
-    def __init__(self, input_dim=6, hidden_dim=64, num_layers=2, dropout=0.3):
+    def __init__(self, input_dim, hidden_dim, num_layers, dropout):
         super().__init__()
         self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.layer_norm = nn.LayerNorm(hidden_dim)
@@ -30,7 +30,7 @@ class GRURegressor(nn.Module):
         return self.fc(last_output).squeeze(-1)
 
 class RNNRegressor(nn.Module):
-    def __init__(self, input_dim=6, hidden_dim=64, num_layers=2, dropout=0.2):
+    def __init__(self, input_dim, hidden_dim, num_layers, dropout):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -51,6 +51,9 @@ def train_deep_model(processed_dir: str, model_name: str):
     df = load_cir_data(processed_dir)
     X_seq, y_seq, x_scaler, y_scaler = scale_and_sequence(df, seq_len=10)
     
+    # Determine input dimension from feature columns
+    input_dim = len(DATA_CONFIG['feature_columns'])
+    
     X_train, X_val, y_train, y_val = train_test_split(
         X_seq, y_seq, test_size=TRAINING_CONFIG['validation_split'], 
         random_state=TRAINING_CONFIG['random_seed'], shuffle=False
@@ -62,9 +65,24 @@ def train_deep_model(processed_dir: str, model_name: str):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     model_classes = {
-        'lstm': LSTMRegressor,
-        'gru': GRURegressor, 
-        'rnn': RNNRegressor
+        'lstm': lambda: LSTMRegressor(
+            input_dim=input_dim,
+            hidden_dim=LSTM_CONFIG['hidden_dim'],
+            num_layers=LSTM_CONFIG['num_layers'],
+            dropout=LSTM_CONFIG['dropout']
+        ),
+        'gru': lambda: GRURegressor(
+            input_dim=input_dim,
+            hidden_dim=GRU_CONFIG['hidden_dim'],
+            num_layers=GRU_CONFIG['num_layers'],
+            dropout=GRU_CONFIG['dropout']
+        ),
+        'rnn': lambda: RNNRegressor(
+            input_dim=input_dim,
+            hidden_dim=RNN_CONFIG['hidden_dim'],
+            num_layers=RNN_CONFIG['num_layers'],
+            dropout=RNN_CONFIG['dropout']
+        )
     }
     
     model = model_classes[model_name]().to(device)
