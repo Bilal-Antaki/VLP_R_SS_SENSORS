@@ -7,7 +7,12 @@ MODEL_CONFIG = {
     'sequence_length': 10,
     'batch_size': 32,
     'learning_rate': 0.001,
+<<<<<<< HEAD
     'epochs': 300
+=======
+    'epochs': 300,
+    'patience': 30
+>>>>>>> 4a5587a19d7e800ecc74d1435a3f8cc8c0d24b85
 }
 
 GRU_CONFIG = {
