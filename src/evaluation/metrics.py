@@ -1,29 +1,19 @@
-# src/evaluation/metrics.py
 import numpy as np
 from sklearn.metrics import mean_squared_error
+import time
 
 def calculate_rmse(y_true, y_pred):
-    """
-    Calculate RMSE for regression evaluation
-    
-    Args:
-        y_true: True values
-        y_pred: Predicted values
-        
-    Returns:
-        RMSE value
-    """
+    """Calculate RMSE for regression evaluation"""
     return np.sqrt(mean_squared_error(y_true, y_pred))
 
-def print_rmse(model_name, y_true, y_pred):
-    """
-    Print RMSE for a model
-    
-    Args:
-        model_name: Name of the model
-        y_true: True values
-        y_pred: Predicted values
-    """
-    rmse = calculate_rmse(y_true, y_pred)
-    print(f"{model_name} RMSE: {rmse:.4f}")
-    return rmse
+def time_execution(func):
+    """Decorator to measure execution time"""
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        execution_time = end_time - start_time
+        if isinstance(result, dict):
+            result['runtime'] = execution_time
+        return result, execution_time
+    return wrapper

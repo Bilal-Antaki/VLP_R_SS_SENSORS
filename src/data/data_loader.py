@@ -5,25 +5,16 @@ import torch
 from sklearn.preprocessing import StandardScaler
 from ..config import DATA_CONFIG
 
-def load_cir_data(processed_dir: str, filter_keyword: str = None) -> pd.DataFrame:
+def load_cir_data(processed_dir: str) -> pd.DataFrame:
     """Load CIR data from processed directory"""
     filepath = os.path.join(processed_dir, DATA_CONFIG['input_file'].split('/')[-1])
-    if os.path.exists(filepath):
-        df = pd.read_csv(filepath)
-        print(f"Loaded {len(df)} data points from {filepath}")
-        return df
-    else:
-        raise FileNotFoundError(f"File not found: {filepath}")
+    df = pd.read_csv(filepath)
+    return df
 
 def extract_features_and_target(df: pd.DataFrame):
     """Extract features and target from DataFrame"""
     features = DATA_CONFIG['feature_columns']
     target = DATA_CONFIG['target_column']
-    
-    # Check if all required columns exist
-    missing_cols = [col for col in features + [target] if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing columns in data: {missing_cols}")
     
     X = df[features]
     y = df[target]
@@ -44,20 +35,13 @@ def scale_and_sequence(df, seq_len=10):
     X = X.values
     y = y.values
     
-    # Use StandardScaler for better gradient flow
     x_scaler = StandardScaler()
     y_scaler = StandardScaler()
     
     X_scaled = x_scaler.fit_transform(X)
     y_scaled = y_scaler.fit_transform(y.reshape(-1, 1)).flatten()
     
-    print(f"Original y (r) range: [{y.min():.3f}, {y.max():.3f}]")
-    print(f"Data shape: X={X_scaled.shape}, y={y_scaled.shape}")
-    
-    # Create sequences
     X_seq, y_seq = sequence_split(X_scaled, y_scaled, seq_len)
-    
-    print(f"Sequence shape: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
     
     return (
         torch.tensor(X_seq, dtype=torch.float32),
@@ -76,4 +60,4 @@ def scale_features_only(df):
     x_scaler = StandardScaler()
     X_scaled = x_scaler.fit_transform(X)
     
-    return X_scaled, y, x_scaler 
+    return X_scaled, y, x_scaler
